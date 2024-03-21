@@ -1,0 +1,15 @@
+schema_version: 20180708
+name: logs_to_kafka
+version: 0.0.28
+runtime: python
+build_image: fnproject/python:3.9-dev
+run_image: fnproject/python:3.9
+entrypoint: /python/bin/fdk /function/func.py handler
+memory: 256
+config:
+  bootstrap_server: 10.100.2.28:9093
+  ca_cert_secret_name: ca-cert1
+  client_cert_secret_name: client_cert.pem1
+  security_protocol: SSL
+  topic_name: testSSL
+  vauld_ocid: ocid1.vault.oc1.ap-singapore-1.gzsqyawjaaciq.abzwsljrulpxnltvqguropgdsanjrk4kv3sepzrmt2mkiq3iyvpayrfzhr7q

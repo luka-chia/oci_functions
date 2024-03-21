@@ -1,0 +1,34 @@
+﻿{
+	"dedupeKey": "f05c235b-1c5d-43a9-84ed-d6f9ea66832e",
+	"title": "luka-dbcs-alarm",
+	"type": "OK_TO_FIRING",
+	"severity": "WARNING",
+	"timestampEpochMillis": 1688373660000,
+	"timestamp": "2023-07-03T08:41:00Z",
+	"alarmMetaData": [
+		{
+			"id": "ocid1.alarm.oc1.ap-singapore-1.aaaaaaaalrxkjl2t77dllr5olwbwqclwy7hhw43p4vlsqcfegpoz36vdo3iq",
+			"status": "FIRING",
+			"severity": "WARNING",
+			"namespace": "oci_database",
+			"query": "CpuUtilization[1m]{resourceName = \"luka-dbsystem\"}.mean() <= 1",
+			"totalMetricsFiring": 1,
+			"dimensions": [
+				{
+					"hostName": "lukadb",
+					"deploymentType": "vm",
+					"resourceId": "ocid1.dbsystem.oc1.ap-singapore-1.anzwsljrak7gbriaxqtnqfouzmagw6dpdmuexui7om2fh3qknzypylb6auzq",
+					"resourceName": "luka-dbsystem",
+					"instanceNumber": "1",
+					"instanceName": "DB0703",
+					"resourceName_database": "db0703",
+					"resourceId_database": "ocid1.database.oc1.ap-singapore-1.anzwsljrak7gbriamom6j4u7zpjcwyhy3zuvncsib6h7on4g2cbimmd2otoq"
+				}
+			],
+			"alarmUrl": "https://cloud.oracle.com/monitoring/alarms/ocid1.alarm.oc1.ap-singapore-1.aaaaaaaalrxkjl2t77dllr5olwbwqclwy7hhw43p4vlsqcfegpoz36vdo3iq?region=ap-singapore-1",
+			"alarmSummary": "Alarm \"luka-dbcs-alarm\" is in a \"FIRING\" state; because 1 metric meets the trigger rule: \"CpuUtilization[1m]{resourceName = \"luka-dbsystem\"}.mean() <= 1\", with a trigger delay of 1 minute"
+		}
+	],
+	"notificationType": "Grouped messages across metric streams",
+	"version": 1.4
+}

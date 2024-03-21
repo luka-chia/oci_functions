@@ -1,0 +1,8 @@
+schema_version: 20180708
+name: luka_dotnet_queue
+version: 0.0.47
+runtime: dotnet
+build_image: fnproject/dotnet:6.0-1.0.9-dev
+run_image: fnproject/dotnet:6.0-1.0.9
+cmd: Function:Greeter:greet
+entrypoint: dotnet Function.dll
