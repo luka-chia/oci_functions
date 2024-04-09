@@ -1,0 +1,15 @@
+schema_version: 20180708
+name: logs_to_kafka
+version: 0.0.3
+runtime: python
+build_image: fnproject/python:3.9-dev
+run_image: fnproject/python:3.9
+entrypoint: /python/bin/fdk /function/func.py handler
+memory: 256
+config:
+  bootstrap_server: <kafka_server_public_ip>:9093
+  ca_cert_secret_name: ca_cert_secret_name
+  client_cert_secret_name: client_cert_secret_name
+  security_protocol: SSL
+  topic_name: quickstart-events
+  vauld_ocid: <vault_ocid>
