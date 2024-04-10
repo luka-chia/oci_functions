@@ -22,30 +22,33 @@ def get_imported_certificates(all_regions, all_compartments):
 
             for certificate in certificates:
                 if certificate.config_type == "IMPORTED":
-                    imported_certificates.append(certificate)
+                    today = datetime.now().date()
+                    cert_expiry_date = certificate.current_version_summary.validity.time_of_validity_not_after
+                    remaining_days = cert_expiry_date.date()-today
+
+                    imported_certificate = {
+                        "certificate_name": certificate.name,
+                        "region": region,
+                        "compartment": certificate.compartment_id,
+                        "certificate_expiry_date": cert_expiry_date.strftime("%Y-%m-%d %H:%M:%S"),
+                        "remaining_days_before_expiry": remaining_days.days
+                    }
+                    imported_certificates.append(imported_certificate)
 
         return imported_certificates
     except Exception as ex: 
         logging.getLogger().error('failed to get imported certificates ' + str(ex))
         raise
 
-def get_expire_certificates(import_certificates, days):
-    logging.getLogger().info('begin get expire certificates')
-    expire_certificates = list()
+def get_expiry_certificates(import_certificates, days):
+    logging.getLogger().info('begin get expiry certificates')
+    expiry_certificates = list()
     for cert in import_certificates:
-        cert_expiry_date = cert.current_version_summary.validity.time_of_validity_not_after
-        today = datetime.now().date()
-        remaining_days = cert_expiry_date.date()-today
-        if remaining_days.days < int(days):
-            expire_certificate = dict()
-            expire_certificate["name"] = cert.name
-            expire_certificate["compartment"] = cert.compartment_id
-            expire_certificate["time_of_validity_not_after"] = cert_expiry_date.strftime("%Y-%m-%d %H:%M:%S")
-            expire_certificate["remaining_days"] = remaining_days.days
-            expire_certificates.append(expire_certificate)
-        print(remaining_days)
+        remaining_days = cert.get("remaining_days_before_expiry")
+        if remaining_days < int(days):
+            expiry_certificates.append(cert)
     
-    return expire_certificates
+    return expiry_certificates
 
 def publish_notification(topic_id, msg_title, body):
     logging.getLogger().info('begin send alarm to notification')
@@ -111,19 +114,19 @@ def handler(ctx, data: io.BytesIO = None):
         
         import_certificates = get_imported_certificates(all_regions=all_regions, all_compartments=all_compartments)
 
-        expire_certificates = get_expire_certificates(import_certificates=import_certificates, days=days)
+        expiry_certificates = get_expiry_certificates(import_certificates=import_certificates, days=days)
 
-        if len(expire_certificates)>0:
-            publish_notification(topic_id=topic_id, msg_title="alert", body=expire_certificates)
+        if len(expiry_certificates)>0:
+            publish_notification(topic_id=topic_id, msg_title="alert", body=expiry_certificates)
         else:
             logging.getLogger().info("currently, there is no expiry certificates")
 
         return response.Response(ctx,
-        response_data={"response": expire_certificates},
-        headers={"Content-Type": "application/json"})
+                                 response_data={"response": expiry_certificates},
+                                 headers={"Content-Type": "application/json"})
         
     except (Exception, ValueError) as ex:
         logging.getLogger().error('error in execute this function: ' + str(ex))
         return response.Response(ctx,
-        response_data={"response": "error"},
-        headers={"Content-Type": "application/json"})
+                                 response_data={"response": "An error occurred"},
+                                 headers={"Content-Type": "application/json"})
