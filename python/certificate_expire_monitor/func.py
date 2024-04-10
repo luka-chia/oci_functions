@@ -32,15 +32,18 @@ def get_expire_certificates(import_certificates, days):
     logging.getLogger().info('begin get expire certificates')
     expire_certificates = list()
     for cert in import_certificates:
-        str_date = cert.current_version_summary.validity.time_of_validity_not_after
+        cert_expiry_date = cert.current_version_summary.validity.time_of_validity_not_after
         today = datetime.now().date()
-
-        remaining_days = str_date.date()-today
-
-        if remaining_days.days < days:
-            expire_certificates.append(cert)
+        remaining_days = cert_expiry_date.date()-today
+        if remaining_days.days < int(days):
+            expire_certificate = dict()
+            expire_certificate["name"] = cert.name
+            expire_certificate["compartment"] = cert.compartment_id
+            expire_certificate["time_of_validity_not_after"] = cert_expiry_date.strftime("%Y-%m-%d %H:%M:%S")
+            expire_certificate["remaining_days"] = remaining_days.days
+            expire_certificates.append(expire_certificate)
         print(remaining_days)
-
+    
     return expire_certificates
 
 def publish_notification(topic_id, msg_title, body):
@@ -55,7 +58,8 @@ def publish_notification(topic_id, msg_title, body):
         msg = oci.ons.models.MessageDetails(title = msg_title, body = msg_body)
         print(msg, flush=True)
         client.publish_message(topic_id, msg)
-    except Exception:
+    except Exception as ex:
+        logging.getLogger().error('error in publishing the alarm about expiry certificate: ' + str(ex))
         raise
 
 def handler(ctx, data: io.BytesIO = None):
@@ -67,13 +71,16 @@ def handler(ctx, data: io.BytesIO = None):
 
         import_certificates = get_imported_certificates()
         expire_certificates = get_expire_certificates(import_certificates=import_certificates, days=days)
-        publish_notification(topic_id=topic_id, msg_title="alert", body=expire_certificates)
+        if len(expire_certificates)>0:
+            publish_notification(topic_id=topic_id, msg_title="alert", body=expire_certificates)
+        else:
+            logging.getLogger().info("currently, there is no expiry certificates")
 
         return response.Response(ctx,
         response_data={"response": expire_certificates},
         headers={"Content-Type": "application/json"})
     except (Exception, ValueError) as ex:
-        logging.getLogger().info('error in publishing the alarm about expiry certificate: ' + str(ex))
+        logging.getLogger().error('error in execute this function: ' + str(ex))
         return response.Response(ctx,
         response_data={"response": "error"},
         headers={"Content-Type": "application/json"})
