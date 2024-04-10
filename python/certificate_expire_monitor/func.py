@@ -6,26 +6,27 @@ import base64
 from datetime import datetime
 from fdk import response
 
-def get_imported_certificates():
+def get_imported_certificates(all_regions, all_compartments):
+    imported_certificates = list()
     signer = oci.auth.signers.get_resource_principals_signer()
     try:
-        certificates_management_client = oci.certificates_management.CertificatesManagementClient({}, signer = signer)
-        # Send the request to service, some parameters are not required, see API doc for more info
-        list_certificates_response = certificates_management_client.list_certificates(
-            compartment_id="ocid1.compartment.oc1..aaaaaaaajyvcxbeipsa5s4jgzdi7o3oztfqpgxickubwkajwku5hfh4octoq"
-            )
+        for region in all_regions:
+            certificates_management_client = oci.certificates_management.CertificatesManagementClient({"region": region}, signer = signer)
+            # Send the request to service, some parameters are not required, see API doc for more info
+            # compartment_id = compartment.get("id")
+            logging.getLogger().info('begin get certificates in region={} and id={}'.format(region, "compartment_id"))
+            list_certificates_response = certificates_management_client.list_certificates(compartment_id="ocid1.compartment.oc1..aaaaaaaajyvcxbeipsa5s4jgzdi7o3oztfqpgxickubwkajwku5hfh4octoq")
 
-        # Get the data from response
-        certificates = list_certificates_response.data.items
-        imported_certificates = list()
+            # Get the data from response
+            certificates = list_certificates_response.data.items
 
-        for certificate in certificates:
-            if certificate.config_type == "IMPORTED":
-                imported_certificates.append(certificate)
+            for certificate in certificates:
+                if certificate.config_type == "IMPORTED":
+                    imported_certificates.append(certificate)
 
         return imported_certificates
-    except:
-        logging.getLogger().error('failed to get imported certificates')
+    except Exception as ex: 
+        logging.getLogger().error('failed to get imported certificates ' + str(ex))
         raise
 
 def get_expire_certificates(import_certificates, days):
@@ -56,11 +57,44 @@ def publish_notification(topic_id, msg_title, body):
         signer = oci.auth.signers.get_resource_principals_signer()
         client = oci.ons.NotificationDataPlaneClient({}, signer = signer)
         msg = oci.ons.models.MessageDetails(title = msg_title, body = msg_body)
-        print(msg, flush=True)
         client.publish_message(topic_id, msg)
     except Exception as ex:
         logging.getLogger().error('error in publishing the alarm about expiry certificate: ' + str(ex))
         raise
+
+def get_all_regions():
+    logging.getLogger().info('====== get all regions')
+    signer = oci.auth.signers.get_resource_principals_signer()
+    client = oci.identity.IdentityClient({}, signer = signer)
+
+    # Get all subscribed regions
+    subscribedRegionList = client.list_region_subscriptions(signer.tenancy_id).data
+    all_regions = list()
+    for region in subscribedRegionList:
+        all_regions.append(region.region_name)
+    
+    return all_regions
+
+def get_all_compartments():
+    logging.getLogger().info('====== get all compartments')
+
+    signer = oci.auth.signers.get_resource_principals_signer()
+    client = oci.identity.IdentityClient(config={}, signer=signer)
+    # OCI API for managing users, groups, compartments, and policies
+    try:
+        # Returns a list of all compartments and subcompartments in the tenancy (root compartment)
+        compartments = client.list_compartments(
+            signer.tenancy_id,
+            compartment_id_in_subtree=True,
+            access_level='ANY'
+        )
+        # Create a list that holds a list of the compartments id and name next to each other
+        compartments = [{"id": c.id, "name": c.name } for c in compartments.data]
+    except Exception as ex:
+        print("ERROR: Cannot access compartments", ex, flush=True)
+        raise
+    compartments.append({"id": signer.tenancy_id, "name": 'root'})
+    return compartments
 
 def handler(ctx, data: io.BytesIO = None):
     logging.getLogger().info("begin ================================================================================")
@@ -69,8 +103,16 @@ def handler(ctx, data: io.BytesIO = None):
         topic_id = str(cfg["topic_id"])
         days = cfg["days"]
 
-        import_certificates = get_imported_certificates()
+        all_regions = get_all_regions()
+        logging.getLogger().info(f"all regions count is  [{len(all_regions)}]")
+
+        all_compartments = get_all_compartments()
+        logging.getLogger().info(f"all comparements count is [{len(all_compartments)}]")
+        
+        import_certificates = get_imported_certificates(all_regions=all_regions, all_compartments=all_compartments)
+
         expire_certificates = get_expire_certificates(import_certificates=import_certificates, days=days)
+
         if len(expire_certificates)>0:
             publish_notification(topic_id=topic_id, msg_title="alert", body=expire_certificates)
         else:
@@ -79,6 +121,7 @@ def handler(ctx, data: io.BytesIO = None):
         return response.Response(ctx,
         response_data={"response": expire_certificates},
         headers={"Content-Type": "application/json"})
+        
     except (Exception, ValueError) as ex:
         logging.getLogger().error('error in execute this function: ' + str(ex))
         return response.Response(ctx,
