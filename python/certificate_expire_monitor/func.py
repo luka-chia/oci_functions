@@ -51,7 +51,7 @@ def get_expiry_certificates(import_certificates, expiration_warning_days):
     return expiry_certificates
 
 def publish_notification(topic_id, msg_title, body, expiration_warning_days):
-    logging.getLogger().info('begin send alarm to notification')
+    logging.getLogger().info('begin to send alarm to notification')
     try:
         msg_begin = f"Dear user\n\nAfter inspection, we found some certificates whose expiration time is less than expiration_warning_days({expiration_warning_days}) from the current time. If the certificate expires and is not updated, it will affect your service. Please check the certificate in advance and handle it. Thank you!\nThese certificates are about to expire as follows:\n\n\n"
         topic_id = topic_id
@@ -67,7 +67,7 @@ def publish_notification(topic_id, msg_title, body, expiration_warning_days):
         raise
 
 def get_all_regions():
-    logging.getLogger().info('====== get all regions')
+    logging.getLogger().info('begin to get all regions')
     signer = oci.auth.signers.get_resource_principals_signer()
     client = oci.identity.IdentityClient({}, signer = signer)
 
@@ -80,7 +80,7 @@ def get_all_regions():
     return all_regions
 
 def get_all_compartments():
-    logging.getLogger().info('====== get all compartments')
+    logging.getLogger().info('begin to get all compartments')
 
     signer = oci.auth.signers.get_resource_principals_signer()
     client = oci.identity.IdentityClient(config={}, signer=signer)
@@ -101,7 +101,7 @@ def get_all_compartments():
     return compartments
 
 def handler(ctx, data: io.BytesIO = None):
-    logging.getLogger().info("begin ================================================================================")
+    logging.getLogger().info("begin to invoke the function")
     cfg = ctx.Config()
     try:
         topic_id = str(cfg["topic_id"])
@@ -121,7 +121,7 @@ def handler(ctx, data: io.BytesIO = None):
             publish_notification(topic_id=topic_id, msg_title="[critical] An alarm about these expiry certificates", body=expiry_certificates, expiration_warning_days=expiration_warning_days)
         else:
             logging.getLogger().info("currently, there is no expiry certificates")
-
+        logging.getLogger().info("this function invoke is completed")
         return response.Response(ctx,
                                  response_data={"response": expiry_certificates},
                                  headers={"Content-Type": "application/json"})
