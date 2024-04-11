@@ -5,7 +5,7 @@ runtime: python
 build_image: fnproject/python:3.11-dev
 run_image: fnproject/python:3.11
 entrypoint: /python/bin/fdk /function/func.py handler
-memory: 256
+memory: 512
 timeout: 300
 config:
   expiration_warning_days: "500"
