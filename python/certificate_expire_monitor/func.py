@@ -21,7 +21,7 @@ def get_imported_certificates(all_regions, all_compartments):
                 # Get the data from response
                 certificates = list_certificates_response.data.items
                 for certificate in certificates:
-                    if certificate.config_type == "IMPORTED":
+                    if certificate.config_type == "IMPORTED" and certificate.lifecycle_state == "ACTIVE":
                         today = datetime.now().date()
                         cert_expiry_date = certificate.current_version_summary.validity.time_of_validity_not_after
                         remaining_days = cert_expiry_date.date()-today
