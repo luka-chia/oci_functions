@@ -12,28 +12,28 @@ def get_imported_certificates(all_regions, all_compartments):
     try:
         for region in all_regions:
             certificates_management_client = oci.certificates_management.CertificatesManagementClient({"region": region}, signer = signer)
-            # Send the request to service, some parameters are not required, see API doc for more info
-            # compartment_id = compartment.get("id")
-            logging.getLogger().info('begin get certificates in region={} and id={}'.format(region, "compartment_id"))
-            list_certificates_response = certificates_management_client.list_certificates(compartment_id="ocid1.compartment.oc1..aaaaaaaajyvcxbeipsa5s4jgzdi7o3oztfqpgxickubwkajwku5hfh4octoq")
+            for compartment in all_compartments:
+                # Send the request to service, some parameters are not required, see API doc for more info
+                compartment_id = compartment.get("id")
+                logging.getLogger().info("begin get certificates in region={0} and id={1}".format(region, compartment_id))
+                list_certificates_response = certificates_management_client.list_certificates(compartment_id=compartment_id)
 
-            # Get the data from response
-            certificates = list_certificates_response.data.items
+                # Get the data from response
+                certificates = list_certificates_response.data.items
+                for certificate in certificates:
+                    if certificate.config_type == "IMPORTED":
+                        today = datetime.now().date()
+                        cert_expiry_date = certificate.current_version_summary.validity.time_of_validity_not_after
+                        remaining_days = cert_expiry_date.date()-today
 
-            for certificate in certificates:
-                if certificate.config_type == "IMPORTED":
-                    today = datetime.now().date()
-                    cert_expiry_date = certificate.current_version_summary.validity.time_of_validity_not_after
-                    remaining_days = cert_expiry_date.date()-today
-
-                    imported_certificate = {
-                        "certificate_name": certificate.name,
-                        "region": region,
-                        "compartment": certificate.compartment_id,
-                        "certificate_expiry_date": cert_expiry_date.strftime("%Y-%m-%d %H:%M:%S"),
-                        "remaining_days_before_expiry": remaining_days.days
-                    }
-                    imported_certificates.append(imported_certificate)
+                        imported_certificate = {
+                            "certificate_name": certificate.name,
+                            "region": region,
+                            "compartment": certificate.compartment_id,
+                            "certificate_expiry_date": cert_expiry_date.strftime("%Y-%m-%d %H:%M:%S"),
+                            "remaining_days_before_expiry": remaining_days.days
+                        }
+                        imported_certificates.append(imported_certificate)
 
         return imported_certificates
     except Exception as ex: 
@@ -72,10 +72,8 @@ def get_all_regions():
     client = oci.identity.IdentityClient({}, signer = signer)
 
     # Get all subscribed regions
-    subscribedRegionList = client.list_region_subscriptions(signer.tenancy_id).data
-    all_regions = list()
-    for region in subscribedRegionList:
-        all_regions.append(region.region_name)
+    subscribedRegionList = client.list_region_subscriptions(signer.tenancy_id)
+    all_regions = [c.region_name for c in subscribedRegionList.data]
     
     return all_regions
 
