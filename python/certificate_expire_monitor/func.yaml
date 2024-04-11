@@ -1,6 +1,6 @@
 schema_version: 20180708
 name: certificate-expiry-alarm
-version: 0.0.2
+version: 0.0.40
 runtime: python
 build_image: fnproject/python:3.11-dev
 run_image: fnproject/python:3.11
@@ -8,5 +8,5 @@ entrypoint: /python/bin/fdk /function/func.py handler
 memory: 256
 timeout: 300
 config:
-  topic_id: test
-  days: 500
+  expiration_warning_days: "500"
+  topic_id: ocid1.onstopic.oc1.ap-singapore-1.amaaaaaaak7gbriad6fharvjxc4g24ybikxg6dznwi2xpb5gyy3xa4dbvvha

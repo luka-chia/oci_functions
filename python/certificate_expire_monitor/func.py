@@ -40,22 +40,23 @@ def get_imported_certificates(all_regions, all_compartments):
         logging.getLogger().error('failed to get imported certificates ' + str(ex))
         raise
 
-def get_expiry_certificates(import_certificates, days):
+def get_expiry_certificates(import_certificates, expiration_warning_days):
     logging.getLogger().info('begin get expiry certificates')
     expiry_certificates = list()
     for cert in import_certificates:
         remaining_days = cert.get("remaining_days_before_expiry")
-        if remaining_days < int(days):
+        if remaining_days < int(expiration_warning_days):
             expiry_certificates.append(cert)
     
     return expiry_certificates
 
-def publish_notification(topic_id, msg_title, body):
+def publish_notification(topic_id, msg_title, body, expiration_warning_days):
     logging.getLogger().info('begin send alarm to notification')
     try:
+        msg_begin = f"Dear user\n\nAfter inspection, we found some certificates whose expiration time is less than expiration_warning_days({expiration_warning_days}) from the current time. If the certificate expires and is not updated, it will affect your service. Please check the certificate in advance and handle it. Thank you!\nThese certificates are about to expire as follows:\n\n\n"
         topic_id = topic_id
-        msg_title = "certificate expire alarm"
-        msg_body = json.dumps(body)
+        msg_title = msg_title
+        msg_body = msg_begin + json.dumps(body)
         logging.getLogger().info(f"send message [{msg_body}] to topic [{topic_id}]")
         signer = oci.auth.signers.get_resource_principals_signer()
         client = oci.ons.NotificationDataPlaneClient({}, signer = signer)
@@ -94,7 +95,7 @@ def get_all_compartments():
         # Create a list that holds a list of the compartments id and name next to each other
         compartments = [{"id": c.id, "name": c.name } for c in compartments.data]
     except Exception as ex:
-        print("ERROR: Cannot access compartments", ex, flush=True)
+        logging.getLogger().error("ERROR: Cannot access compartments" + str(ex))
         raise
     compartments.append({"id": signer.tenancy_id, "name": 'root'})
     return compartments
@@ -104,7 +105,7 @@ def handler(ctx, data: io.BytesIO = None):
     cfg = ctx.Config()
     try:
         topic_id = str(cfg["topic_id"])
-        days = cfg["days"]
+        expiration_warning_days = cfg["expiration_warning_days"]
 
         all_regions = get_all_regions()
         logging.getLogger().info(f"all regions count is  [{len(all_regions)}]")
@@ -114,10 +115,10 @@ def handler(ctx, data: io.BytesIO = None):
         
         import_certificates = get_imported_certificates(all_regions=all_regions, all_compartments=all_compartments)
 
-        expiry_certificates = get_expiry_certificates(import_certificates=import_certificates, days=days)
+        expiry_certificates = get_expiry_certificates(import_certificates=import_certificates, expiration_warning_days=expiration_warning_days)
 
         if len(expiry_certificates)>0:
-            publish_notification(topic_id=topic_id, msg_title="alert", body=expiry_certificates)
+            publish_notification(topic_id=topic_id, msg_title="[critical] An alarm about these expiry certificates", body=expiry_certificates, expiration_warning_days=expiration_warning_days)
         else:
             logging.getLogger().info("currently, there is no expiry certificates")
 
