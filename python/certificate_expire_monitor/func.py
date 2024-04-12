@@ -6,15 +6,15 @@ import base64
 from datetime import datetime
 from fdk import response
 
-def get_imported_certificates(all_regions, all_compartments):
+def get_imported_certificates(signer, all_regions, all_compartments):
     imported_certificates = list()
-    signer = oci.auth.signers.get_resource_principals_signer()
     try:
         for region in all_regions:
             certificates_management_client = oci.certificates_management.CertificatesManagementClient({"region": region}, signer = signer)
             for compartment in all_compartments:
                 # Send the request to service, some parameters are not required, see API doc for more info
                 compartment_id = compartment.get("id")
+                compartment_name = compartment.get("name")
                 logging.getLogger().info("begin get certificates in region={0} and id={1}".format(region, compartment_id))
                 list_certificates_response = certificates_management_client.list_certificates(compartment_id=compartment_id)
 
@@ -29,7 +29,7 @@ def get_imported_certificates(all_regions, all_compartments):
                         imported_certificate = {
                             "certificate_name": certificate.name,
                             "region": region,
-                            "compartment": certificate.compartment_id,
+                            "compartment": compartment_name,
                             "certificate_expiry_date": cert_expiry_date.strftime("%Y-%m-%d %H:%M:%S"),
                             "remaining_days_before_expiry": remaining_days.days
                         }
@@ -53,10 +53,12 @@ def get_expiry_certificates(import_certificates, expiration_warning_days):
 def publish_notification(topic_id, msg_title, body, expiration_warning_days):
     logging.getLogger().info('begin to send alarm to notification')
     try:
-        msg_begin = f"Dear user\n\nAfter inspection, we found some certificates whose expiration time is less than expiration_warning_days({expiration_warning_days}) from the current time. If the certificate expires and is not updated, it will affect your service. Please check the certificate in advance and handle it. Thank you!\nThese certificates are about to expire as follows:\n\n\n"
+        msg_body = f"Dear user\n\nAfter inspection, we found some certificates whose expiration time is less than expiration_warning_days({expiration_warning_days}) from the current time. If the certificate expires and is not updated, it will affect your service. Please check the certificate in advance and handle it. Thank you!\nThese certificates are about to expire as follows:\n\n\n"
         topic_id = topic_id
         msg_title = msg_title
-        msg_body = msg_begin + json.dumps(body)
+        
+        for item in body:
+            msg_body = msg_body + json.dumps(item) +"\n\n"
         logging.getLogger().info(f"send message [{msg_body}] to topic [{topic_id}]")
         signer = oci.auth.signers.get_resource_principals_signer()
         client = oci.ons.NotificationDataPlaneClient({}, signer = signer)
@@ -66,9 +68,8 @@ def publish_notification(topic_id, msg_title, body, expiration_warning_days):
         logging.getLogger().error('error in publishing the alarm about expiry certificate: ' + str(ex))
         raise
 
-def get_all_regions():
+def get_all_regions(signer):
     logging.getLogger().info('begin to get all regions')
-    signer = oci.auth.signers.get_resource_principals_signer()
     client = oci.identity.IdentityClient({}, signer = signer)
 
     # Get all subscribed regions
@@ -77,10 +78,8 @@ def get_all_regions():
     
     return all_regions
 
-def get_all_compartments():
+def get_all_compartments(signer):
     logging.getLogger().info('begin to get all compartments')
-
-    signer = oci.auth.signers.get_resource_principals_signer()
     client = oci.identity.IdentityClient(config={}, signer=signer)
     # OCI API for managing users, groups, compartments, and policies
     try:
@@ -102,16 +101,19 @@ def handler(ctx, data: io.BytesIO = None):
     logging.getLogger().info("begin to invoke the function")
     cfg = ctx.Config()
     try:
+        signer = oci.auth.signers.get_resource_principals_signer()
         topic_id = str(cfg["topic_id"])
         expiration_warning_days = cfg["expiration_warning_days"]
 
-        all_regions = get_all_regions()
+        all_regions = get_all_regions(signer=signer)
         logging.getLogger().info(f"all regions count is  [{len(all_regions)}]")
+        # test data
+        all_regions = ['eu-paris-1',  'us-ashburn-1', 'ap-seoul-1', 'ap-osaka-1', 'ap-tokyo-1', 'us-phoenix-1', 'ap-singapore-1', 'ap-chuncheon-1']
 
-        all_compartments = get_all_compartments()
+        all_compartments = get_all_compartments(signer=signer)
         logging.getLogger().info(f"all comparements count is [{len(all_compartments)}]")
         
-        import_certificates = get_imported_certificates(all_regions=all_regions, all_compartments=all_compartments)
+        import_certificates = get_imported_certificates(signer=signer, all_regions=all_regions, all_compartments=all_compartments)
 
         expiry_certificates = get_expiry_certificates(import_certificates=import_certificates, expiration_warning_days=expiration_warning_days)
 
